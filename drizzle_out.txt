@@ -1,3 +1,0 @@
-Reading config file 'C:\Users\HP\OneDrive\Desktop\Padhai\Hackathon\DoubtDesk\drizzle.config.ts'
-This version of drizzle-kit is outdated
-Please update drizzle-kit package to the latest version ≡ƒæì
