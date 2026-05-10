@@ -1,11 +1,10 @@
 import { db } from "@/configs/db";
-import { doubtsTable, likesTable, repliesTable, membershipsTable, classroomsTable, usersTable, moderationLogsTable } from "@/configs/schema";
+import { doubtsTable, likesTable, repliesTable, membershipsTable, classroomsTable, usersTable } from "@/configs/schema";
 import { categorizeDoubt } from "@/lib/ai/categorizer";
 import { and, eq, desc, isNull, or, not, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { auth, currentUser } from "@clerk/nextjs/server";
-import { moderateContent } from "@/lib/moderation";
-import { sendWarningEmail, sendBlockEmail } from "@/lib/email";
+import { moderateContent, handleModerationViolation } from "@/lib/moderation";
 
 export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
@@ -143,54 +142,9 @@ export async function POST(req: Request) {
         // 1. AI Moderation Check
         if (content) {
             const moderation = await moderateContent(content);
-            if (!moderation.isAllowed) {
-                // Increment strikes
-                const newViolationCount = (dbUser?.violationCount || 0) + 1;
-                const isThirdViolation = newViolationCount >= 3;
-                let blockedUntil: Date | null = null;
-                let newBlockCount = dbUser?.blockCount || 0;
-
-                if (isThirdViolation) {
-                    newBlockCount += 1;
-                    // Duration: 3 days (1), 1 week (2), 2 weeks (3), etc.
-                    let durationDays = 3;
-                    if (newBlockCount === 2) durationDays = 7;
-                    else if (newBlockCount >= 3) durationDays = 14 * Math.pow(2, newBlockCount - 3);
-
-                    blockedUntil = new Date();
-                    blockedUntil.setDate(blockedUntil.getDate() + durationDays);
-                    
-                    // Send Block Email
-                    await sendBlockEmail(email, durationDays, newBlockCount);
-                }
-
-                await db.update(usersTable)
-                    .set({ 
-                        violationCount: newViolationCount,
-                        isBlocked: isThirdViolation, // Keep for legacy compatibility if needed
-                        blockedUntil: blockedUntil,
-                        blockCount: newBlockCount
-                    })
-                    .where(eq(usersTable.email, email));
-
-                // Log violation
-                await db.insert(moderationLogsTable).values({
-                    userEmail: email,
-                    reason: moderation.reason,
-                    violationType: moderation.violationType || 'other',
-                    contentSnippet: content.substring(0, 100)
-                });
-
-                // Send Email Warning (Simulation)
-                await sendWarningEmail(email, moderation.reason, newViolationCount);
-
-                let errorMessage = `Content flagged: ${moderation.reason}. This is strike ${newViolationCount}/3. Please stick to academic topics.`;
-                if (isThirdViolation && blockedUntil) {
-                    const unlockDate = blockedUntil.toDateString();
-                    errorMessage = `Content flagged. Your account is now blocked for ${newBlockCount > 1 ? 'additional ' : ''}violations. Access restored on ${unlockDate}.`;
-                }
-
-                return NextResponse.json({ error: errorMessage }, { status: 400 });
+            const violationError = await handleModerationViolation(email, content, moderation);
+            if (violationError) {
+                return NextResponse.json({ error: violationError }, { status: 400 });
             }
         }
 
