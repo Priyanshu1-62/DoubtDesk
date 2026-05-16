@@ -80,6 +80,7 @@
     "remark-gfm": "4.0.0",
     "remark-math": "6.0.0",
     "sonner": "1.5.0",
+    "swr": "^2.4.1",
     "tailwind-merge": "2.5.4",
     "tailwindcss-animate": "1.0.7",
     "tesseract.js": "^7.0.0",
