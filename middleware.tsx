@@ -2,7 +2,7 @@ import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { aiLimiter, generalLimiter, videoLimiter } from '@/lib/ratelimit';
 
-const isProtectedRoute = createRouteMatcher(['/dashboard(.*)', '/profile(.*)']);
+const isProtectedRoute = createRouteMatcher(['/dashboard(.*)', '/profile(.*)', '/admin(.*)']);
 
 const isPublicRoute = createRouteMatcher(['/sign-in', '/sign-up', '/api/inngest', '/', '/public-rooms(.*)']);
 

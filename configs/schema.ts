@@ -305,6 +305,7 @@ export const moderationLogsTable = pgTable("moderation_logs", {
     reason: text().notNull(),
     violationType: varchar({ length: 50 }).notNull(), // 'abusive', 'off-topic', etc.
     contentSnippet: text(),
+    status: varchar({ length: 20 }).default("pending").notNull(), // 'pending', 'reviewed', 'dismissed', 'blocked', 'warned'
     createdAt: timestamp().defaultNow().notNull(),
 });
 
