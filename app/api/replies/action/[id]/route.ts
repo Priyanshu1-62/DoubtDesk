@@ -1,28 +1,32 @@
 import { db } from "@/configs/db";
 import { repliesTable, doubtsTable, classroomsTable } from "@/configs/schema";
 import { eq } from "drizzle-orm";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { currentUser } from "@clerk/nextjs/server";
+import { checkUserBlock } from "@/lib/auth-utils";
 import { parseAndValidateRequest } from "@/lib/validations/validate";
 import { updateReplyActionSchema } from "@/lib/validations/reply";
-import { DOUBT_STATUS, DoubtStatus, isValidDoubtStatus } from "@/lib/doubtStatus";
 
-export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const { errorResponse, data } = await parseAndValidateRequest(req, updateReplyActionSchema);
-        if (errorResponse) return errorResponse;
+        const { errorResponse: validationError, data } = await parseAndValidateRequest(req, updateReplyActionSchema);
+        if (validationError) return validationError;
         const { content, imageUrl } = data;
 
         const user = await currentUser();
         if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
         const email = user.primaryEmailAddress?.emailAddress;
         if (!email) return NextResponse.json({ error: "Email required" }, { status: 400 });
+
+        const { isBlocked, errorResponse } = await checkUserBlock(email);
+        if (isBlocked) return errorResponse;
 
         const { id } = await params;
         const replyId = parseInt(id);
 
         if (isNaN(replyId)) {
-            return NextResponse.json({ error: "Invalid data" }, { status: 400 });
+            return NextResponse.json({ error: "Invalid reply ID" }, { status: 400 });
         }
 
         const [reply] = await db.select().from(repliesTable).where(eq(repliesTable.id, replyId)).limit(1);
@@ -41,25 +45,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         if (!isOwner && !isTeacher) {
             return NextResponse.json({ error: "Forbidden: not allowed to edit this reply" }, { status: 403 });
         }
-        const [reply] = await db.select().from(repliesTable).where(eq(repliesTable.id, replyId)).limit(1);
-        if (!reply) return NextResponse.json({ error: "Reply not found" }, { status: 404 });
 
-        let isTeacher = false;
-        if (reply.doubtId) {
-            const [doubt] = await db.select().from(doubtsTable).where(eq(doubtsTable.id, reply.doubtId)).limit(1);
-            if (doubt?.classroomId) {
-                const [room] = await db.select().from(classroomsTable).where(eq(classroomsTable.id, doubt.classroomId)).limit(1);
-                isTeacher = !!(room && email && room.teacherEmail === email);
-            }
-        }
-
-        const isOwner = email && reply.userEmail === email;
-        if (!isOwner && !isTeacher) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
->>>>>>> upstream/main
-        }
-
-        const updateData: any = {};
+        const updateData: { content?: string; imageUrl?: string } = {};
         if (content !== undefined) updateData.content = content;
         if (imageUrl !== undefined) updateData.imageUrl = imageUrl;
 
@@ -75,18 +62,22 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     }
 }
 
-export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
         const user = await currentUser();
         if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
         const email = user.primaryEmailAddress?.emailAddress;
         if (!email) return NextResponse.json({ error: "Email required" }, { status: 400 });
+
+        const { isBlocked, errorResponse } = await checkUserBlock(email);
+        if (isBlocked) return errorResponse;
 
         const { id } = await params;
         const replyId = parseInt(id);
 
         if (isNaN(replyId)) {
-            return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
+            return NextResponse.json({ error: "Invalid reply ID" }, { status: 400 });
         }
 
         const [reply] = await db.select().from(repliesTable).where(eq(repliesTable.id, replyId)).limit(1);
@@ -99,18 +90,6 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
                 const [room] = await db.select().from(classroomsTable).where(eq(classroomsTable.id, doubt.classroomId)).limit(1);
                 isTeacher = !!(room && email && room.teacherEmail === email);
             }
-        }
-        const [reply] = await db.select().from(repliesTable).where(eq(repliesTable.id, replyId)).limit(1);
-        if (!reply) return NextResponse.json({ error: "Reply not found" }, { status: 404 });
-
-        let isTeacher = false;
-        if (reply.doubtId) {
-            const [doubt] = await db.select().from(doubtsTable).where(eq(doubtsTable.id, reply.doubtId)).limit(1);
-            if (doubt?.classroomId) {
-                const [room] = await db.select().from(classroomsTable).where(eq(classroomsTable.id, doubt.classroomId)).limit(1);
-                isTeacher = !!(room && email && room.teacherEmail === email);
-            }
->>>>>>> upstream/main
         }
 
         const isOwner = email && reply.userEmail === email;
