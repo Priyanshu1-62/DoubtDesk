@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import {
+  SignInButton,
+  SignUpButton,
   SignedIn,
   SignedOut,
   useClerk,
@@ -16,6 +18,7 @@ import {
   Clipboard,
   Activity,
   Users,
+  Globe,
 } from "lucide-react";
 
 import Link from "next/link";
@@ -179,11 +182,11 @@ export default function Home() {
 
               {/* Description Subtext Stack */}
               <div className="space-y-2 max-w-md sm:max-w-xl mx-auto xl:mx-0 transition-all duration-300">
-                <div className={`${staatliches.className} text-xs tracking-[0.15em] text-blue-600 dark:text-blue-400 uppercase font-medium`}>
+                <div className={`${staatliches.className} text-xs tracking-[0.16em] text-blue-600 dark:text-blue-400 uppercase font-medium`}>
                   Collaborative classrooms
                 </div>
                 <p className="text-base sm:text-lg text-slate-500 dark:text-zinc-400 leading-relaxed transition-colors duration-300">
-                  A live student collaboration system for doubts, notes, and shared progress across campus groups.
+                  Built for collaborative classrooms, instant doubt solving, and smarter learning.
                 </p>
               </div>
 
@@ -191,8 +194,8 @@ export default function Home() {
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center xl:justify-start gap-4 transition-all duration-300 max-w-md sm:max-w-none mx-auto xl:mx-0">
                 <SignedIn>
                   <Link href="/rooms" className="w-full sm:w-auto">
-                    <button className="group w-full sm:w-auto px-8 py-4 bg-slate-900 text-white dark:bg-white dark:text-black hover:bg-slate-800 dark:hover:bg-zinc-100 rounded-2xl text-base font-bold shadow-xl shadow-slate-950/10 dark:shadow-none transition-all duration-300 flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98]">
-                      <span className={`${staatliches.className} uppercase tracking-[0.06em] text-lg`}>Open Classroom</span>
+                    <button className="group w-full sm:w-auto px-10 py-5 bg-[#5E8CFF] text-white rounded-2xl text-lg font-bold hover:bg-[#8BB8FF] hover:shadow-[0_0_24px_rgba(94,140,255,0.35)] transition-all flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98]">
+                      <span className={`${staatliches.className} uppercase tracking-[0.08em]`}>Open Classroom</span>
                       <ArrowRight className="w-5 h-5 group-hover:translate-x-1.5 transition-transform duration-300" />
                     </button>
                   </Link>
@@ -200,12 +203,20 @@ export default function Home() {
                 
                 <SignedOut>
                   <Link href="/sign-up" className="w-full sm:w-auto">
-                    <button className="group w-full sm:w-auto px-8 py-4 bg-slate-900 text-white dark:bg-white dark:text-black hover:bg-slate-800 dark:hover:bg-zinc-100 rounded-2xl text-base font-bold shadow-xl shadow-slate-950/10 dark:shadow-none transition-all duration-300 flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98]">
-                      <span className={`${staatliches.className} uppercase tracking-[0.06em] text-lg`}>Open Classroom</span>
+                    <button className="group w-full sm:w-auto px-10 py-5 bg-white text-slate-950 rounded-2xl text-lg font-bold hover:bg-slate-200 transition-all flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98]">
+                      <span className={`${staatliches.className} uppercase tracking-[0.08em]`}>Open</span>
+                      <span>Classroom</span>
                       <ArrowRight className="w-5 h-5 group-hover:translate-x-1.5 transition-transform duration-300" />
                     </button>
                   </Link>
                 </SignedOut>
+
+                <Link href="/public-rooms" className="w-full sm:w-auto">
+                  <button className="group w-full sm:w-auto px-10 py-5 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-900 dark:text-white rounded-2xl text-lg font-bold border border-slate-200 dark:border-white/10 transition-all hover:shadow-[0_0_20px_rgba(94,140,255,0.15)] flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98]">
+                    <span className={`${staatliches.className} uppercase tracking-[0.08em]`}>Explore Community</span>
+                    <Globe className="w-5 h-5 text-slate-600 dark:text-slate-400 group-hover:text-blue-600 dark:group-hover:text-[#8BB8FF] group-hover:rotate-12 transition-transform duration-300" />
+                  </button>
+                </Link>
               </div>
             </div>
 
