@@ -446,5 +446,3 @@ export default function ProfilePage() {
     </div>
   );
 }
-
-export { ProfileSkeleton, ErrorState };

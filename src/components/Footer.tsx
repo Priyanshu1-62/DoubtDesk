@@ -171,6 +171,12 @@ export default function Footer() {
                     <span>Dashboard</span>
                   </Link>
                 </li>
+                <li>
+                  <Link href="/dashboard/analytics" className="group flex items-center gap-1.5 transition-transform duration-200 hover:translate-x-0.5 hover:text-blue-500 dark:hover:text-blue-400">
+                    <ChevronRight className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                    <span>Analytics</span>
+                  </Link>
+                </li>
               </ul>
             </div>
 
