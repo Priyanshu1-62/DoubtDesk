@@ -56,9 +56,18 @@ export async function GET(req: Request) {
         }
 
         if (doubt.type === 'teacher') {
-            const [room] = await db.select().from(classroomsTable).where(eq(classroomsTable.id, doubt.classroomId!));
-            const isTeacher = room && email && room.teacherEmail === email;
-            const isOwner = email && doubt.userEmail === email;
+            const [membership] = await db
+            .select()
+            .from(membershipsTable)
+            .where(
+                and(
+                    eq(membershipsTable.userEmail, email),
+                    eq(membershipsTable.classroomId, doubt.classroomId!)
+                )
+            );
+
+                const isTeacher = membership ? canTeach(membership.role) : false;
+                const isOwner = doubt.userEmail === email;
             if (!isTeacher && !isOwner) {
                 return NextResponse.json({ error: "Access denied" }, { status: 403 });
             }

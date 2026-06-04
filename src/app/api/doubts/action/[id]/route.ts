@@ -265,9 +265,18 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
         const isOwner = email && doubt.userEmail === email;
         let isTeacher = false;
 
-        if (doubt.classroomId) {
-            const [room] = await db.select().from(classroomsTable).where(eq(classroomsTable.id, doubt.classroomId));
-            isTeacher = !!(room && email && room.teacherEmail === email);
+        if (doubt.classroomId && email) {
+            const [membership] = await db
+            .select()
+            .from(membershipsTable)
+            .where(
+                and(
+                    eq(membershipsTable.userEmail, email),
+                    eq(membershipsTable.classroomId, doubt.classroomId)
+                )
+            );
+
+            isTeacher = !!(membership && canTeach(membership.role));
         }
 
         // Only owner or teacher can delete
