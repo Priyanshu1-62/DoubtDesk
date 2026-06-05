@@ -5,6 +5,7 @@ import { X, Send, CheckCircle, MessageSquare, Loader2, Upload, File, ZoomIn, Mor
 import { toast } from "sonner";
 import MarkdownRenderer from "./MarkdownRenderer";
 import { DeleteConfirmationDialog } from "./DeleteConfirmationDialog";
+import { Doubt } from "@/types";
 import { OFFLINE_REPLY_QUEUED } from "@/lib/copy-constants";
 interface Reply {
     id: number;
@@ -19,7 +20,7 @@ interface Reply {
 }
 
 interface DoubtRepliesModalProps {
-    doubt: any;
+    doubt: Doubt;
     isOpen: boolean;
     onClose: () => void;
     onReplyChange?: () => void;
@@ -77,6 +78,7 @@ export default function DoubtRepliesModal({ doubt, isOpen, onClose, onReplyChang
                 const { getPendingReplies } = await import("@/lib/offline/syncQueue");
                 const pending = await getPendingReplies(doubt.id);
                 setPendingReplies(pending);
+                await fetchReplies();
             } catch (err) {
                 console.error("Failed to load pending replies:", err);
                 setPendingRepliesError(err);
@@ -681,16 +683,19 @@ export default function DoubtRepliesModal({ doubt, isOpen, onClose, onReplyChang
 
                 {/* Messages Area */}
                 <div className="flex-1 overflow-y-auto p-5 sm:p-8 space-y-4 sm:space-y-6 bg-white/50 dark:bg-slate-900/50">
+                    {pendingRepliesError && (
+                        <div className="flex items-center gap-2.5 px-4 py-3 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-400 text-xs font-bold animate-in fade-in duration-300">
+                            <AlertTriangle className="w-4 h-4 shrink-0 text-red-500" />
+                            <div>
+                                <p className="font-bold">Failed to load offline replies.</p>
+                                <p className="text-[9px] uppercase font-black tracking-widest text-slate-500 mt-0.5">Please refresh or check connection.</p>
+                            </div>
+                        </div>
+                    )}
                     {isLoading ? (
                         <div className="h-full flex flex-col items-center justify-center gap-4">
                             <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
                             <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-500">Loading Thread...</p>
-                        </div>
-                    ) : pendingRepliesError ? (
-                        <div className="h-full flex flex-col items-center justify-center text-center opacity-50">
-                            <AlertTriangle className="w-10 h-10 text-red-500 mb-4 animate-bounce" />
-                            <p className="text-sm font-bold text-red-500">Failed to load offline replies.</p>
-                            <p className="text-[10px] uppercase font-black tracking-widest text-slate-500 mt-2">Please refresh or check connection.</p>
                         </div>
                     ) : (replies.length === 0 && pendingReplies.length === 0) ? (
                         <div className="h-full flex flex-col items-center justify-center text-center opacity-40">
@@ -920,7 +925,7 @@ export default function DoubtRepliesModal({ doubt, isOpen, onClose, onReplyChang
                                     onClick={handlePostOrUpdate}
                                     disabled={isPosting || (!solutionContent.trim() && !solutionImage)}
                                     className="px-10 py-5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-[0.2em] text-[11px] transition-all shadow-xl shadow-emerald-500/20 disabled:opacity-50 disabled:shadow-none flex items-center justify-center gap-3 active:scale-95 group/submit"
-                                >
+                                 aria-label="Interactive button">
                                     {isPosting ? (
                                         <Loader2 className="w-5 h-5 animate-spin" />
                                     ) : (

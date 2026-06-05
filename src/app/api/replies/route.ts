@@ -145,7 +145,12 @@ export async function POST(req: Request) {
             if (isNaN(d.getTime())) {
                 return NextResponse.json({ error: "Invalid createdAt date format" }, { status: 400 });
             }
-            parsedCreatedAt = d;
+            const now = new Date();
+            const age = now.getTime() - d.getTime();
+            const maxOfflineDuration = 30 * 24 * 60 * 60 * 1000; // 30 days
+            if (age >= -300000 && age <= maxOfflineDuration) {
+                parsedCreatedAt = d;
+            }
         }
 
         const newReply = await db.insert(repliesTable).values({

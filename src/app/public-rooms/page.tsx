@@ -9,6 +9,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import useSWRInfinite from "swr/infinite";
 import { useInView } from "react-intersection-observer";
 import ScrollToTopButton from "@/components/ScrollToTopButton";
+import { Doubt } from "@/types";
 import { useUser } from "@clerk/nextjs";
 
 export default function PublicRoomsPage() {
@@ -74,7 +75,7 @@ export default function PublicRoomsPage() {
         setSize(1);
     };
 
-    const getKey = (pageIndex: number, previousPageData: any[]) => {
+    const getKey = (pageIndex: number, previousPageData: Doubt[] | null | undefined) => {
         if (previousPageData && !previousPageData.length) return null;
         
         const userName = typeof window !== 'undefined' ? localStorage.getItem("anonymous_user") : "";
@@ -117,7 +118,7 @@ export default function PublicRoomsPage() {
         revalidateFirstPage: false
     });
 
-    const doubts = data ? [].concat(...data) : [];
+    const doubts = (data ? [].concat(...data) : []) as Doubt[];
     
     // Apply local filters to pending doubts so they match the active view
     const matchingPendingDoubts = pendingDoubts.filter((d) => {
@@ -206,8 +207,6 @@ export default function PublicRoomsPage() {
     return (
         <div className="p-4 md:p-8 space-y-8 max-w-5xl mx-auto pb-24 text-slate-900 dark:text-zinc-100 bg-white dark:bg-black min-h-screen transition-colors duration-500 relative overflow-hidden">
             <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-blue-500/10 dark:from-blue-500/5 blur-[120px] rounded-full -translate-x-1/2 -translate-y-1/2 pointer-events-none z-0" />
-
-            <ScrollToTopButton />
 
             <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b border-slate-100 dark:border-zinc-900/60 relative z-10">
                 <div className="space-y-2">
@@ -315,7 +314,7 @@ export default function PublicRoomsPage() {
                         <button
                             onClick={fetchDoubts}
                             className="px-3 py-2 bg-slate-50 dark:bg-zinc-900/40 text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all"
-                        >
+                         aria-label="Interactive button">
                             Tag
                         </button>
 
@@ -459,7 +458,7 @@ export default function PublicRoomsPage() {
 
             {isAskModalOpen && (
                 <AskDoubt
-                    defaultSubject={filter !== "All" ? filter : "Math"}
+                    defaultSubject={(filter !== "All" && filter !== "Bookmarked") ? filter : "Math"}
                     isOpen={isAskModalOpen}
                     onClose={() => setIsAskModalOpen(false)}
                     onSuccess={() => {

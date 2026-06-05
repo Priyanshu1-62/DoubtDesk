@@ -6,13 +6,26 @@ import AskDoubt from "./AskDoubt";
 import DoubtRepliesModal from "./DoubtRepliesModal";
 import { toast } from "sonner";
 import { DeleteConfirmationDialog } from "./DeleteConfirmationDialog";
+import type { Doubt, Tag } from "@/types";
 import { useSearchParams } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 
 interface DoubtCardProps {
-    doubt: any;
+    doubt: Doubt & {
+        tags?: Tag[];
+        hasBookmarked?: boolean;
+        hasLiked?: boolean;
+        replyCount?: number;
+    };
     onUpdate?: () => void;
-    onViewAISolution?: (doubt: any) => void;
+    onViewAISolution?: (
+        doubt: Doubt & {
+            tags?: Tag[];
+            hasBookmarked?: boolean;
+            hasLiked?: boolean;
+            replyCount?: number;
+        },
+    ) => void;
     role?: string;
     openRepliesOnMount?: boolean;
 }
@@ -190,6 +203,7 @@ export default function DoubtCard({ doubt, onUpdate, onViewAISolution, role, ope
                                         disabled={isPinning}
                                         className={`p-2 rounded-xl border transition-all ${ doubt.isPinned ? "bg-blue-600/20 border-blue-500/40 text-blue-400" : "bg-white/5 border-white/10 text-slate-500 hover:text-blue-400" }`}
                                         title={doubt.isPinned ? "Unpin doubt" : "Pin doubt to top"}
+                                         aria-label="Interactive button"
                                     >
                                         <Pin className={`w-4 h-4 ${doubt.isPinned ? 'fill-blue-400' : ''} ${isPinning ? 'animate-pulse' : ''}`} />
                                     </button>
@@ -234,7 +248,7 @@ export default function DoubtCard({ doubt, onUpdate, onViewAISolution, role, ope
 
                     {(doubt.tags?.length ?? 0) > 0 && (
                         <div className="flex flex-wrap gap-2">
-                            {doubt.tags.map((tag: any) => (
+                            {doubt.tags?.map((tag: Tag) => (
                                 <span
                                     key={tag.id || tag.name}
                                     className="px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-300 text-[9px] font-black uppercase tracking-widest"
@@ -281,6 +295,7 @@ export default function DoubtCard({ doubt, onUpdate, onViewAISolution, role, ope
                                     disabled={isBookmarking}
                                     className={`flex items-center justify-center p-3 rounded-2xl transition-all ${ doubt.hasBookmarked ? "bg-purple-600/20 text-purple-400 border border-purple-500/30 shadow-lg shadow-purple-500/10" : "bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white border border-white/5" }`}
                                     title={doubt.hasBookmarked ? "Remove bookmark" : "Add to bookmarks"}
+                                    aria-label="Interactive button"
                                 >
                                     <Bookmark className={`w-4 h-4 ${isBookmarking ? 'animate-pulse' : ''} ${doubt.hasBookmarked ? 'fill-purple-400' : ''}`} />
                                 </button>
@@ -385,7 +400,7 @@ export default function DoubtCard({ doubt, onUpdate, onViewAISolution, role, ope
                         onClick={(e) => e.stopPropagation()}
                     >
                         <img
-                            src={doubt.imageUrl}
+                            src={doubt.imageUrl ?? undefined}
                             alt="Full View"
                             className="max-w-full max-h-full object-contain rounded-xl shadow-2xl border border-slate-200 dark:border-white/10"
                         />
