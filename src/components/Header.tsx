@@ -7,6 +7,7 @@ import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 import { ThemeToggle } from "./ThemeToggle";
 import { useAppUser } from "@/app/provider";
 import { Menu, X, ChevronRight, ArrowLeft } from "lucide-react";
+import { scrollToSection } from "@/lib/scroll-to-section";
 
 export default function Header() {
   const [isOpen, setIsOpen] = useState(false);
@@ -29,6 +30,7 @@ export default function Header() {
   }, [pathname]);
 
   const pageLinks = [
+    { href: "#features-grid", label: "Features" },
     { href: "#how-it-works", label: "How it works" },
     { href: "#testimonials", label: "Testimonials" },
     { href: "/ask-ai", label: "AI Solver" },
@@ -41,19 +43,9 @@ export default function Header() {
     setIsOpen(false);
 
     if (pathname === "/") {
-      const element = document.getElementById(targetId);
-      if (element) {
-        element.scrollIntoView({ behavior: "smooth" });
-      }
+      scrollToSection(targetId);
     } else {
       router.push(`/#${targetId}`);
-      // Scroll after navigation completes
-      setTimeout(() => {
-        const element = document.getElementById(targetId);
-        if (element) {
-          element.scrollIntoView({ behavior: "smooth" });
-        }
-      }, 100);
     }
   };
 
