@@ -11,12 +11,22 @@ export default function SessionTracker() {
     // Dedicated logout broadcast key
     const LOGOUT_EVENT_KEY = "mentorix_logout";
 
+    // Clears session activity data
+    const clearSessionState = () => {
+        localStorage.removeItem(STORAGE_KEY);
+    };
+
     // Publishes a cross-tab logout event and signs out the current tab
     const broadcastLogout = async () => {
-        localStorage.removeItem(STORAGE_KEY);
+        clearSessionState();
         localStorage.setItem(LOGOUT_EVENT_KEY, Date.now().toString());
-        await signOut();
-    }
+        try {
+            await signOut();
+        } 
+        catch (error) {
+            console.error("[SessionTracker] Failed to signout after broadcasting logout.", error);
+        }
+    };
 
     useEffect(() => {
         if (!user) return;
@@ -49,10 +59,18 @@ export default function SessionTracker() {
 
         // Listen for logout broadcasts from other tabs
         const handleStorageEvent = async (event: StorageEvent) => {
-            if (event.key === LOGOUT_EVENT_KEY) {
-                await signOut();
+            if (event.key !== LOGOUT_EVENT_KEY) {
+                return;
             }
-        }
+
+            clearSessionState();
+            try {
+                await signOut();
+            } 
+            catch (error) {
+                console.error("[SessionTracker] Failed to signout after receiving logout broadcast.", error);
+            }
+        };
 
         document.addEventListener("visibilitychange", handleVisibilityChange);
         window.addEventListener("storage", handleStorageEvent);
