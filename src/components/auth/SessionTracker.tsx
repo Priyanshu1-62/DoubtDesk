@@ -8,6 +8,16 @@ export default function SessionTracker() {
     const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
     const STORAGE_KEY = "mentorix_last_activity";
 
+    // Dedicated logout broadcast key
+    const LOGOUT_EVENT_KEY = "mentorix_logout";
+
+    // Publishes a cross-tab logout event and signs out the current tab
+    const broadcastLogout = async () => {
+        localStorage.removeItem(STORAGE_KEY);
+        localStorage.setItem(LOGOUT_EVENT_KEY, Date.now().toString());
+        await signOut();
+    }
+
     useEffect(() => {
         if (!user) return;
 
@@ -19,8 +29,7 @@ export default function SessionTracker() {
                 const elapsed = now - parseInt(lastActivity);
                 if (elapsed > SESSION_DURATION) {
                     console.log("[SessionTracker] Session expired. Signing out...");
-                    localStorage.removeItem(STORAGE_KEY);
-                    await signOut();
+                    await broadcastLogout();
                     return;
                 }
             }
@@ -38,8 +47,20 @@ export default function SessionTracker() {
             }
         };
 
+        // Listen for logout broadcasts from other tabs
+        const handleStorageEvent = async (event: StorageEvent) => {
+            if (event.key === LOGOUT_EVENT_KEY) {
+                await signOut();
+            }
+        }
+
         document.addEventListener("visibilitychange", handleVisibilityChange);
-        return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+        window.addEventListener("storage", handleStorageEvent);
+
+        return () => {
+            document.removeEventListener("visibilitychange", handleVisibilityChange);
+            window.removeEventListener("storage", handleStorageEvent);
+        }
     }, [user, signOut]);
 
     return null;
