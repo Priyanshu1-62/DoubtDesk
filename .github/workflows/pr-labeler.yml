@@ -329,8 +329,13 @@ jobs:
             }
 
             const rabbitMarker = '<!-- coderabbit-trigger -->';
-            const hasCodeRabbitComment = comments.some(
-              c => c.body.includes(rabbitMarker) || c.body.includes('@coderabbitai review')
+            const { data: prComments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+            });
+            const hasCodeRabbitComment = prComments.some(
+              c => c.body && (c.body.includes(rabbitMarker) || c.body.includes('@coderabbitai review'))
             );
 
             if (!hasCodeRabbitComment) {
