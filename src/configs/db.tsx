@@ -8,7 +8,11 @@ if (typeof globalThis.WebSocket === 'undefined') {
     neonConfig.webSocketConstructor = ws;
 }
 
-const pool = new Pool({ connectionString: getDatabaseUrl() });
+const pool = new Pool({
+    connectionString: getDatabaseUrl(),
+    max: process.env.DATABASE_POOL_MAX ? parseInt(process.env.DATABASE_POOL_MAX, 10) : 10,
+    idleTimeoutMillis: process.env.DATABASE_POOL_IDLE_TIMEOUT ? parseInt(process.env.DATABASE_POOL_IDLE_TIMEOUT, 10) : 30000,
+});
 
 // Register pool error listener to prevent unhandled connection errors from crashing the process
 pool.on('error', (err: Error) => {
