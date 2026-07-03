@@ -34,7 +34,7 @@ jest.mock("@/inngest/client", () => ({
     inngest: { send: inngestSend },
 }));
 
-let selectCallCount = 0;
+let mockSelectCallCount = 0;
 
 jest.mock("@/configs/db", () => {
     const makeSelectChain = (result: unknown[]) => ({
@@ -47,8 +47,8 @@ jest.mock("@/configs/db", () => {
     return {
         db: {
             select: jest.fn().mockImplementation(() => {
-                selectCallCount += 1;
-                if (selectCallCount === 1) {
+                mockSelectCallCount += 1;
+                if (mockSelectCallCount === 1) {
                     return makeSelectChain(mockDoubt ? [mockDoubt] : []);
                 }
                 return makeSelectChain(mockReply ? [mockReply] : []);
@@ -104,7 +104,7 @@ describe("POST /api/doubts/[id]/accept — idempotency (issue #687)", () => {
     beforeEach(() => {
         jest.clearAllMocks();
         inngestSend.mockReset();
-        selectCallCount = 0;
+        mockSelectCallCount = 0;
 
         // Default: unsolved doubt, valid reply, state-changing update
         mockDoubt = { userEmail: "asker@test.com", isSolved: "unsolved", solvedReplyId: null };
@@ -149,7 +149,7 @@ describe("POST /api/doubts/[id]/accept — idempotency (issue #687)", () => {
         expect(inngestSend).toHaveBeenCalledTimes(1);
 
         // Second POST — UPDATE finds no row to change (idempotency guard at DB level)
-        selectCallCount = 0;
+        mockSelectCallCount = 0;
         inngestSend.mockClear();
         mockDoubt = { userEmail: "asker@test.com", isSolved: "solved", solvedReplyId: 42 };
         mockUpdatedDoubt = null;
