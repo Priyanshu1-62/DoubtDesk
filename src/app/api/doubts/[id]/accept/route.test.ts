@@ -21,7 +21,7 @@ let mockReply: {
 
 let mockUpdatedDoubt: { id: number } | null = { id: 1 };
 
-const inngestSend = jest.fn();
+const mockInngestSend = jest.fn();
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 jest.mock("@clerk/nextjs/server", () => ({
@@ -31,7 +31,7 @@ jest.mock("@clerk/nextjs/server", () => ({
 }));
 
 jest.mock("@/inngest/client", () => ({
-    inngest: { send: inngestSend },
+    inngest: { send: mockInngestSend },
 }));
 
 let mockSelectCallCount = 0;
@@ -103,7 +103,7 @@ async function callPost(replyId = 42) {
 describe("POST /api/doubts/[id]/accept — idempotency (issue #687)", () => {
     beforeEach(() => {
         jest.clearAllMocks();
-        inngestSend.mockReset();
+        mockInngestSend.mockReset();
         mockSelectCallCount = 0;
 
         // Default: unsolved doubt, valid reply, state-changing update
@@ -120,8 +120,8 @@ describe("POST /api/doubts/[id]/accept — idempotency (issue #687)", () => {
         expect(body.success).toBe(true);
         expect(body.message).toBe("Answer accepted successfully");
         // karma event fired exactly once
-        expect(inngestSend).toHaveBeenCalledTimes(1);
-        expect(inngestSend).toHaveBeenCalledWith(
+        expect(mockInngestSend).toHaveBeenCalledTimes(1);
+        expect(mockInngestSend).toHaveBeenCalledWith(
             expect.objectContaining({ name: "karma/answer.accepted" })
         );
     });
@@ -139,25 +139,25 @@ describe("POST /api/doubts/[id]/accept — idempotency (issue #687)", () => {
         expect(body.success).toBe(true);
         expect(body.message).toBe("Answer was already accepted (no-op)");
         // No karma event fired
-        expect(inngestSend).not.toHaveBeenCalled();
+        expect(mockInngestSend).not.toHaveBeenCalled();
     });
 
     it("karmaScore is awarded only once after two POSTs with the same replyId", async () => {
         // First POST — genuine state transition
         const res1 = await callPost(42);
         expect((await res1.json()).message).toBe("Answer accepted successfully");
-        expect(inngestSend).toHaveBeenCalledTimes(1);
+        expect(mockInngestSend).toHaveBeenCalledTimes(1);
 
         // Second POST — UPDATE finds no row to change (idempotency guard at DB level)
         mockSelectCallCount = 0;
-        inngestSend.mockClear();
+        mockInngestSend.mockClear();
         mockDoubt = { userEmail: "asker@test.com", isSolved: "solved", solvedReplyId: 42 };
         mockUpdatedDoubt = null;
 
         const res2 = await callPost(42);
         expect((await res2.json()).message).toBe("Answer was already accepted (no-op)");
         // inngest.send was NOT called on the second request
-        expect(inngestSend).not.toHaveBeenCalled();
+        expect(mockInngestSend).not.toHaveBeenCalled();
     });
 
     it("returns 500 with a generic message and does not leak error details", async () => {

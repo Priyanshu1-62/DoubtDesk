@@ -29,18 +29,24 @@ jest.mock('@/lib/auth/membership-guard', () => {
     };
 });
 
-jest.mock('@/configs/db', () => ({
-    db: {
-        select: jest.fn().mockImplementation(() => ({
-            from: jest.fn().mockImplementation(() => ({
-                where: jest.fn().mockImplementation(() => {
-                    const data = selectResultQueue.shift() ?? [];
-                    return Promise.resolve(data);
-                }),
-            })),
-        })),
-    },
-}));
+jest.mock('@/configs/db', () => {
+    const makeChain = () => {
+        const chain: any = {
+            from: jest.fn().mockImplementation(() => chain),
+            where: jest.fn().mockImplementation(() => chain),
+            then: jest.fn().mockImplementation((resolve) => {
+                const data = selectResultQueue.shift() ?? [];
+                return Promise.resolve(resolve(data));
+            }),
+        };
+        return chain;
+    };
+    return {
+        db: {
+            select: jest.fn().mockImplementation(() => makeChain()),
+        },
+    };
+});
 
 describe('Teacher Analytics API Endpoint', () => {
     beforeEach(() => {
@@ -119,5 +125,25 @@ describe('Teacher Analytics API Endpoint', () => {
 
         expect(res?.status).toBe(400);
         expect(json.error).toBe('Invalid classroom ID');
+    });
+
+    it('allows an admin to query analytics for all classrooms successfully', async () => {
+        // Mock requireAdmin to succeed
+        mockRequireAdmin.mockResolvedValue(undefined);
+
+        // Mock usersTable query (dbUser is an admin)
+        selectResultQueue.push(
+            [{ id: 1, email: 'admin@example.com', role: 'admin' }], // usersTable query
+            [{ id: 1, name: 'Admin Class', university: 'Admin Uni' }], // classroomsList query (admin branch)
+            [] // doubtsTable query
+        );
+
+        const req = new NextRequest('http://localhost/api/teacher/analytics?classroomId=all');
+
+        const res = await GET(req);
+
+        expect(res?.status).toBe(200);
+        expect(mockRequireAdmin).toHaveBeenCalled();
+        expect(mockRequireTeacher).not.toHaveBeenCalled();
     });
 });
