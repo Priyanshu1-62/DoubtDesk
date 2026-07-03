@@ -52,7 +52,7 @@ export async function GET(req: NextRequest) {
             ? null
             : parseOptionalClassroomId(classroomIdStr);
         
-        if (classroomId === null) {
+        if (classroomIdStr === "all") {
             await requireAdmin();
         }
         

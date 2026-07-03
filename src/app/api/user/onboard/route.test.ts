@@ -22,7 +22,9 @@ jest.mock('@/configs/db', () => ({
             select: jest.fn().mockImplementation(() => createQueryMock(selectResultQueue.shift() ?? [])),
             update: jest.fn().mockImplementation(() => ({
                 set: jest.fn().mockImplementation(() => ({
-                    where: jest.fn().mockResolvedValue({}),
+                    where: jest.fn().mockImplementation(() => ({
+                        returning: jest.fn().mockResolvedValue([{ id: 1 }]),
+                    })),
                 })),
             })),
         } as any;

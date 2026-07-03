@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/configs/db';
 import { usersTable } from '@/configs/schema';
-import { eq } from 'drizzle-orm';
+import { and, eq, or, isNull } from 'drizzle-orm';
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { z } from 'zod';
 
@@ -83,8 +83,8 @@ export async function POST(req: Request) {
 
         const finalYear = role === 'student' ? year! : 'Staff/Faculty';
 
-        // Update user in database
-        await db.update(usersTable)
+        // Update user in database atomically
+        const updateResult = await db.update(usersTable)
             .set({
                 university,
                 year: finalYear,
@@ -97,7 +97,20 @@ export async function POST(req: Request) {
                 instituteInfo: role === 'teacher' ? (instituteInfo || null) : null,
                 onboarded: true
             })
-            .where(eq(usersTable.email, email));
+            .where(
+                and(
+                    eq(usersTable.email, email),
+                    or(
+                        eq(usersTable.onboarded, false),
+                        isNull(usersTable.onboarded)
+                    )
+                )
+            )
+            .returning({ id: usersTable.id });
+
+        if (updateResult.length === 0) {
+            return NextResponse.json({ error: 'User is already onboarded' }, { status: 400 });
+        }
 
         return NextResponse.json({ success: true });
 
