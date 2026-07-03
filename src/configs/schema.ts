@@ -6,6 +6,7 @@ import { integer, pgTable, varchar, text, timestamp, boolean, index, uniqueIndex
 // ═══════════════════════════════════════════════════════════════════
 
 export const orgRoleEnum = pgEnum("org_role", ["owner", "admin", "teacher", "member"]);
+export const userRoleEnum = pgEnum("user_role", ["student", "teacher", "admin"]);
 
 export const organizationsTable = pgTable("organizations", {
     id: integer().primaryKey().generatedAlwaysAsIdentity(),
@@ -44,7 +45,8 @@ export const usersTable = pgTable("users", {
     university: varchar({ length: 255 }),
     year: varchar({ length: 50 }),
     collegeEmail: varchar({ length: 255 }),
-    role: varchar({ length: 20 }),
+    role: userRoleEnum("role").default("student").notNull(),
+    requestedRole: userRoleEnum("requested_role"),
     onboarded: boolean().default(false),
     violationCount: integer().default(0).notNull(),
     isBlocked: boolean().default(false).notNull(),

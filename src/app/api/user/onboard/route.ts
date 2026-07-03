@@ -49,6 +49,17 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'User email not found' }, { status: 401 });
         }
 
+        // Fetch user from DB to check if already onboarded
+        const [dbUser] = await db
+            .select({ onboarded: usersTable.onboarded })
+            .from(usersTable)
+            .where(eq(usersTable.email, email))
+            .limit(1);
+
+        if (dbUser && dbUser.onboarded) {
+            return NextResponse.json({ error: 'User is already onboarded' }, { status: 400 });
+        }
+
         const body = await req.json();
         const parsed = onboardingSchema.safeParse(body);
 
@@ -77,7 +88,8 @@ export async function POST(req: Request) {
             .set({
                 university,
                 year: finalYear,
-                role,
+                role: 'student', // keep role='student' until verified
+                requestedRole: role, // store requestedRole
                 collegeEmail,
                 interests: role === 'student' ? (interests || null) : null,
                 learningGoals: role === 'student' ? (learningGoals || null) : null,
