@@ -248,7 +248,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
                         .where(eq(doubtTagsTable.doubtId, doubtId));
                     return {
                         updated: updatedRow,
-                        savedTags: existingLinks.map((row) => row.tag),
+                        savedTags: existingLinks.map((row: any) => row.tag),
                     };
                 }
 

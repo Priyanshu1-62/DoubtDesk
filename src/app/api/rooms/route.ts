@@ -54,7 +54,7 @@ export async function GET(req: Request) {
         let recommendedRooms: Classroom[] = [];
 
         if (dbUser && dbUser.university && dbUser.year) {
-            const joinedIds = joinedRooms.map((r) => r.id);
+            const joinedIds = joinedRooms.map((r: any) => r.id);
             
             let conditions = [
                 eq(classroomsTable.university, dbUser.university),

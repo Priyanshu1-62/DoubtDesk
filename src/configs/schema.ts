@@ -39,6 +39,7 @@ export const classroomsTable = pgTable(
         university: varchar({ length: 255 }).notNull(),
         year: varchar({ length: 50 }).notNull(),
         teacherEmail: varchar({ length: 255 }).notNull(),
+        organizationId: integer(),
         inviteCode: varchar({ length: 10 }).notNull().unique(),
         inviteCodeExpiresAt: timestamp("invite_code_expires_at", { withTimezone: true }),
         allowedEmailDomains: text("allowed_email_domains").array(),
@@ -571,3 +572,19 @@ export const videoJobsTable = pgTable("video_jobs", {
         foreignColumns: [usersTable.email],
     }).onDelete("cascade"),
 }));
+
+export const organizationsTable = pgTable("organizations", {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    name: varchar({ length: 255 }).notNull(),
+    slug: varchar({ length: 255 }).notNull().unique(),
+    ownerEmail: varchar({ length: 255 }).notNull(),
+    createdAt: timestamp().defaultNow().notNull(),
+});
+
+export const organizationMembershipsTable = pgTable("organization_memberships", {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    organizationId: integer().notNull(),
+    userEmail: varchar({ length: 255 }).notNull(),
+    role: varchar({ length: 20 }).notNull(),
+    createdAt: timestamp().defaultNow().notNull(),
+});

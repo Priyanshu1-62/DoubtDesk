@@ -33,7 +33,7 @@ export async function GET(req: Request) {
         const dbUser = dbUserResults[0];
 
         const classroomIds = memberships
-            .map((m) => m.classroomId)
+            .map((m: any) => m.classroomId)
             .filter((id): id is number => id !== null && id !== undefined);
 
         let classrooms: ProfileClassroom[] = [];

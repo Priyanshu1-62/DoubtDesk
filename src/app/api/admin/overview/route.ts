@@ -132,17 +132,17 @@ export async function GET(request: Request) {
         .groupBy(doubtsTable.classroomId);
 
         // Build mapping helpers
-        const studentCountMap = new Map(studentCounts.map(c => [c.classroomId, c.count]));
-        const doubtStatsMap = new Map(doubtStats.map(d => [d.classroomId, d]));
-        const pedagogyStatsMap = new Map(pedagogyStats.map(p => [p.classroomId, p]));
-        const alertsCountMap = new Map(activeAlertsPerClassroom.map(a => [a.classroomId, a.count]));
-        const resolutionTimeMap = new Map(resolutionTimes.map(r => [r.classroomId, r.avgTimeMins]));
+        const studentCountMap = new Map(studentCounts.map((c: any) => [c.classroomId, c.count]));
+        const doubtStatsMap = new Map(doubtStats.map((d: any) => [d.classroomId, d]));
+        const pedagogyStatsMap = new Map(pedagogyStats.map((p: any) => [p.classroomId, p]));
+        const alertsCountMap = new Map(activeAlertsPerClassroom.map((a: any) => [a.classroomId, a.count]));
+        const resolutionTimeMap = new Map(resolutionTimes.map((r: any) => [r.classroomId, r.avgTimeMins]));
 
-        const classroomHealth = classrooms.map(classroom => {
+        const classroomHealth = classrooms.map((classroom: any) => {
             const cId = classroom.id;
             const enrolledStudents = studentCountMap.get(cId) || 0;
-            const dStats = doubtStatsMap.get(cId) || { total: 0, solved: 0 };
-            const pStats = pedagogyStatsMap.get(cId) || { totalReplies: 0, driftedReplies: 0 };
+            const dStats: any = doubtStatsMap.get(cId) || { total: 0, solved: 0 };
+            const pStats: any = pedagogyStatsMap.get(cId) || { totalReplies: 0, driftedReplies: 0 };
             const alertsCount = alertsCountMap.get(cId) || 0;
             const avgResolutionTime = resolutionTimeMap.get(cId) || 0;
 
