@@ -44,5 +44,3 @@ export const db = dbClient;
 
 /** Re-export the database client so callers import from one place. */
 export { db as default };
-
-
