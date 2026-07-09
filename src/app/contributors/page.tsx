@@ -9,7 +9,7 @@ import {
   MessageCircle,
 } from "lucide-react";
 import { GitHubContributor } from "@/types";
-import { DISCORD_INVITE_URL } from "@/lib/constants";
+import { DISCORD_INVITE_URL } from "@/lib/constants/constants";
 
 async function getContributors() {
   const res = await fetch(
