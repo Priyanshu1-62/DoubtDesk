@@ -33,7 +33,7 @@ import { createDoubtSchema } from "@/lib/validations/doubt";
 import { createClassroomDoubtNotifications } from "@/lib/notifications/service";
 import { inngest } from "@/inngest/client";
 import { enforceApiRateLimit } from "@/lib/ratelimit/api-rate-limit";
-import { generalLimiter } from "@/lib/ratelimit/ratelimit";
+import { aiLimiter, generalLimiter } from "@/lib/ratelimit/ratelimit";
 import { buildRankOrder } from "@/lib/search/search";
 import { canTeach } from "@/lib/auth/membership-guard";
 import { currentUser } from "@clerk/nextjs/server";
@@ -361,6 +361,9 @@ export async function POST(req: Request) {
         return errorResponse(violationError, 400);
       }
     }
+
+    const aiRateLimitResponse = await enforceApiRateLimit(aiLimiter, email, "ai");
+    if (aiRateLimitResponse) return aiRateLimitResponse;
 
     const subTopic = await categorizeDoubt(content || "", subject, imageUrl);
 
