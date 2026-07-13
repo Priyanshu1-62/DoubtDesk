@@ -45,25 +45,39 @@ export async function GET(req: Request) {
 
     classroomFilter = eq(doubtsTable.classroomId, classroomId);
   } else {
-    // Only include classrooms where the caller is a teacher/owner/admin.
-    // Previously this branch pulled EVERY membership regardless of role, so
-    // a student who joined any classroom could omit the `?classroomId=`
-    // query param and receive the full teacher-only CSV aggregated across
-    // every classroom they were in (issue #885). The role filter mirrors
-    // the TEACHER_ROLES set used by `requireTeacher` so the two branches
-    // stay in sync — the sibling `/api/analytics` endpoint is intentionally
-    // student-visible; only `/export` needs the tighter gate.
-    const userMemberships = await db
-      .select({
-        classroomId: membershipsTable.classroomId,
-        role: membershipsTable.role,
-      })
-      .from(membershipsTable)
-      .where(eq(membershipsTable.userEmail, email));
+    // Only include classrooms where the caller is teacher/owner/admin.
+    // Two authorization paths, mirroring what requireTeacher/requireMembership
+    // accepts in the ?classroomId= branch so a legitimate owner doesn't get
+    // 403'd here just because their membership row is missing (see codeant
+    // review on #885):
+    //   1. membershipsTable row with role in TEACHER_ROLES
+    //   2. classroomsTable.teacherEmail matches (owner fallback used inside
+    //      requireMembership when no membership row exists)
+    // Role filter is pushed into SQL to avoid a JS-side re-filter
+    // (per coderabbit review).
+    const [teacherMemberships, ownedClassrooms] = await Promise.all([
+      db
+        .select({ classroomId: membershipsTable.classroomId })
+        .from(membershipsTable)
+        .where(
+          and(
+            eq(membershipsTable.userEmail, email),
+            inArray(membershipsTable.role, [...TEACHER_ROLES]),
+          ),
+        ),
+      db
+        .select({ id: classroomsTable.id })
+        .from(classroomsTable)
+        .where(eq(classroomsTable.teacherEmail, email)),
+    ]);
 
-    const userClassroomIds = userMemberships
-      .filter((m) => TEACHER_ROLES.has(m.role))
-      .map((m) => m.classroomId);
+    // Dedupe — a teacher will usually appear in both queries.
+    const userClassroomIds = Array.from(
+      new Set<number>([
+        ...teacherMemberships.map((m) => m.classroomId),
+        ...ownedClassrooms.map((c) => c.id),
+      ]),
+    );
 
     if (userClassroomIds.length === 0) {
       return NextResponse.json(
