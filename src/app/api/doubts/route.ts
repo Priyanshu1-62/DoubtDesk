@@ -25,20 +25,20 @@ import {
   getTableColumns,
   count,
 } from "drizzle-orm";
-import { moderateContent, handleModerationViolation } from "@/lib/moderation";
-import { buildErrorResponse, errorResponse } from "@/lib/error-handler";
-import { checkUserBlock } from "@/lib/auth-utils";
+import { moderateContent, handleModerationViolation } from "@/lib/moderation/moderation";
+import { buildErrorResponse, errorResponse } from "@/lib/errors/error-handler";
+import { checkUserBlock } from "@/lib/auth/auth-utils";
 import { parseAndValidateRequest } from "@/lib/validations/validate";
 import { createDoubtSchema } from "@/lib/validations/doubt";
 import { createClassroomDoubtNotifications } from "@/lib/notifications/service";
 import { inngest } from "@/inngest/client";
-import { enforceApiRateLimit } from "@/lib/api-rate-limit";
-import { generalLimiter } from "@/lib/ratelimit";
-import { buildRankOrder } from "@/lib/search";
+import { enforceApiRateLimit } from "@/lib/ratelimit/api-rate-limit";
+import { generalLimiter } from "@/lib/ratelimit/ratelimit";
+import { buildRankOrder } from "@/lib/search/search";
 import { canTeach } from "@/lib/auth/membership-guard";
 import { currentUser } from "@clerk/nextjs/server";
-import { parsePositiveInt } from "@/lib/utils";
-import { toPublicDoubt } from "@/lib/anonymity";
+import { parsePositiveInt, escapeLike } from "@/lib/utils/utils";
+import { toPublicDoubt } from "@/lib/anonymity/anonymity";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -106,9 +106,10 @@ export async function GET(req: Request) {
       // NOTE: we deliberately do NOT match on userEmail. Matching the author's
       // email here would let a caller probe email fragments and infer which
       // anonymized posts belong to a given author from result presence/counts.
+      const safeSearch = escapeLike(search);
       const searchCondition = or(
-        ilike(doubtsTable.content, `%${search}%`),
-        ilike(doubtsTable.subject, `%${search}%`),
+        ilike(doubtsTable.content, `%${safeSearch}%`),
+        ilike(doubtsTable.subject, `%${safeSearch}%`),
       );
       if (searchCondition) conditions.push(searchCondition);
     }
@@ -125,7 +126,7 @@ export async function GET(req: Request) {
         .select({ doubtId: bookmarksTable.doubtId })
         .from(bookmarksTable)
         .where(eq(bookmarksTable.userEmail, email));
-      const bookmarkedIds = userBookmarks.map((b) => b.doubtId);
+      const bookmarkedIds = userBookmarks.map((b: any) => b.doubtId);
       if (bookmarkedIds.length > 0) {
         conditions.push(inArray(doubtsTable.id, bookmarkedIds));
       } else {
@@ -136,7 +137,7 @@ export async function GET(req: Request) {
     const pageStr = searchParams.get("page");
     const offsetStr = searchParams.get("offset");
     const limitStr = searchParams.get("limit");
-    const limit = parsePositiveInt(limitStr, 20);
+    const limit = parsePositiveInt(limitStr, 20, 100);
     const offset = offsetStr
       ? parsePositiveInt(offsetStr, 0)
       : pageStr
@@ -162,11 +163,6 @@ export async function GET(req: Request) {
       conditions.push(eq(doubtsTable.isSolved, "unsolved"));
     }
 
-    const replyCountSql =
-      sql<number>`coalesce((SELECT count(*) FROM ${repliesTable} WHERE ${repliesTable.doubtId} = ${doubtsTable.id}), 0)`.mapWith(
-        Number,
-      );
-
     const [totalCountRow] = await db
       .select({ count: count() })
       .from(doubtsTable)
@@ -176,7 +172,6 @@ export async function GET(req: Request) {
     const query = db
       .select({
         ...getTableColumns(doubtsTable),
-        replyCount: replyCountSql,
       })
       .from(doubtsTable);
 
@@ -190,7 +185,10 @@ export async function GET(req: Request) {
     if (sort === "popular") {
       orderByFields.push(desc(doubtsTable.likes));
     } else if (sort === "most-replied") {
-      orderByFields.push(desc(replyCountSql));
+      // Needed here only to sort correctly at the DB level before paging.
+      // Not selected as a column, so it costs nothing for any other sort mode.
+      const replyCountOrderSql = sql`coalesce((SELECT count(*) FROM ${repliesTable} WHERE ${repliesTable.doubtId} = ${doubtsTable.id}), 0)`;
+      orderByFields.push(desc(replyCountOrderSql));
     }
     orderByFields.push(desc(doubtsTable.createdAt));
 
@@ -200,34 +198,73 @@ export async function GET(req: Request) {
       .limit(limit)
       .offset(offset);
 
-    if (email && doubts.length > 0) {
-      const userLikes = await db
-        .select({ doubtId: likesTable.doubtId })
-        .from(likesTable)
-        .where(eq(likesTable.userEmail, email));
+    // Batch-fetch reply counts for just the returned page (max `limit` ids)
+    // instead of running a correlated subquery per row in the SELECT.
+    if (doubts.length > 0) {
+      const replyCountRows = await db
+        .select({ doubtId: repliesTable.doubtId, count: count() })
+        .from(repliesTable)
+        .where(inArray(repliesTable.doubtId, doubts.map((d: any) => d.id)))
+        .groupBy(repliesTable.doubtId);
 
-      const likedIds = new Set(userLikes.map((l) => l.doubtId));
-      doubts = doubts.map((doubt) => ({
+      const replyCountMap = new Map(
+        replyCountRows.map((r: any) => [r.doubtId, Number(r.count)]),
+      );
+
+      doubts = doubts.map((doubt: any) => ({
+        ...doubt,
+        replyCount: replyCountMap.get(doubt.id) ?? 0,
+      }));
+    }
+
+    // Only fetch the current user's likes/bookmarks for this page's doubts,
+    // not every like/bookmark they have ever made across the entire app.
+    const pageDoubtIds = doubts.map((d: any) => d.id);
+
+    if (email && doubts.length > 0) {
+      const userLikes =
+        pageDoubtIds.length > 0
+          ? await db
+              .select({ doubtId: likesTable.doubtId })
+              .from(likesTable)
+              .where(
+                and(
+                  eq(likesTable.userEmail, email),
+                  inArray(likesTable.doubtId, pageDoubtIds),
+                ),
+              )
+          : [];
+
+      const likedIds = new Set(userLikes.map((l: any) => l.doubtId));
+      doubts = doubts.map((doubt: any) => ({
         ...doubt,
         hasLiked: likedIds.has(doubt.id),
       }));
     }
 
     if (doubts.length > 0 && email) {
-      const userBookmarks = await db
-        .select({ doubtId: bookmarksTable.doubtId })
-        .from(bookmarksTable)
-        .where(eq(bookmarksTable.userEmail, email));
+      const userBookmarks =
+        pageDoubtIds.length > 0
+          ? await db
+              .select({ doubtId: bookmarksTable.doubtId })
+              .from(bookmarksTable)
+              .where(
+                and(
+                  eq(bookmarksTable.userEmail, email),
+                  inArray(bookmarksTable.doubtId, pageDoubtIds),
+                ),
+              )
+          : [];
 
-      const bookmarkedIds = new Set(userBookmarks.map((b) => b.doubtId));
-      doubts = doubts.map((doubt) => ({
+      const bookmarkedIds = new Set(userBookmarks.map((b: any) => b.doubtId));
+      doubts = doubts.map((doubt: any) => ({
         ...doubt,
         hasBookmarked: bookmarkedIds.has(doubt.id),
       }));
     }
 
     if (doubts.length > 0) {
-      const tagRows = await db
+      const tagRows: { doubtId: number; id: number; name: string; normalizedName: string }[] = await db
         .select({
           doubtId: doubtTagsTable.doubtId,
           id: tagsTable.id,
@@ -236,21 +273,22 @@ export async function GET(req: Request) {
         })
         .from(doubtTagsTable)
         .innerJoin(tagsTable, eq(doubtTagsTable.tagId, tagsTable.id))
-        .where(inArray(doubtTagsTable.doubtId, doubts.map((d) => d.id)));
+        .where(inArray(doubtTagsTable.doubtId, doubts.map((d: any) => d.id)));
 
-      const tagsByDoubt = tagRows.reduce<
-        Record<number, { id: number; name: string; normalizedName: string }[]>
-      >((acc, row) => {
-        acc[row.doubtId] = acc[row.doubtId] || [];
-        acc[row.doubtId].push({
-          id: row.id,
-          name: row.name,
-          normalizedName: row.normalizedName,
-        });
-        return acc;
-      }, {});
+      const tagsByDoubt = tagRows.reduce(
+        (acc: Record<number, { id: number; name: string; normalizedName: string }[]>, row: typeof tagRows[number]) => {
+          acc[row.doubtId] = acc[row.doubtId] || [];
+          acc[row.doubtId].push({
+            id: row.id,
+            name: row.name,
+            normalizedName: row.normalizedName,
+          });
+          return acc;
+        },
+        {},
+      );
 
-      doubts = doubts.map((doubt) => ({
+      doubts = doubts.map((doubt: any) => ({
         ...doubt,
         tags: tagsByDoubt[doubt.id] || [],
       }));
@@ -261,7 +299,7 @@ export async function GET(req: Request) {
     // Strip author identifiers (userEmail), the internal embedding vector and
     // soft-delete marker before returning. Only the anonymized handle and a
     // session-derived `isOwnPost` flag are exposed. See src/lib/anonymity.ts.
-    const publicDoubts = doubts.map((doubt) => toPublicDoubt(doubt, email));
+    const publicDoubts = doubts.map((doubt: any) => toPublicDoubt(doubt, email));
 
     return NextResponse.json({
       doubts: publicDoubts,
@@ -411,13 +449,13 @@ export async function POST(req: Request) {
           ),
         );
 
-      const existingTagsMap = new Map(existingClassroomTags.map((t) => [t.normalizedName, t]));
+      const existingTagsMap = new Map(existingClassroomTags.map((t: typeof tagsTable.$inferSelect) => [t.normalizedName, t]));
       const tagsToInsert: (typeof tagsTable.$inferInsert)[] = [];
 
       for (const name of normalizedTags) {
-        const match = existingTagsMap.get(name);
+        const match = existingTagsMap.get(name) as typeof tagsTable.$inferInsert | undefined;
         if (match) {
-          savedTags.push(match);
+          savedTags.push(match as typeof tagsTable.$inferSelect);
         } else {
           tagsToInsert.push({
             name: name.replace(/\b\w/g, (char) => char.toUpperCase()),

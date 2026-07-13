@@ -2,14 +2,15 @@ import { db } from "@/configs/db";
 import { membershipsTable, tagsTable, doubtsTable, doubtTagsTable } from "@/configs/schema";
 import { and, desc, eq, ilike, isNull, or, sql, type SQL } from "drizzle-orm";
 import { NextResponse } from "next/server";
-import { enforceApiRateLimit } from "@/lib/api-rate-limit";
-import { generalLimiter } from "@/lib/ratelimit";
-import { buildErrorResponse } from "@/lib/error-handler";
+import { enforceApiRateLimit } from "@/lib/ratelimit/api-rate-limit";
+import { generalLimiter } from "@/lib/ratelimit/ratelimit";
+import { buildErrorResponse } from "@/lib/errors/error-handler";
 import {
     parseOptionalClassroomId,
     requireAuth,
     requireMembership,
 } from "@/lib/auth/membership-guard";
+import { escapeLike } from "@/lib/utils/utils";
 
 const normalizeTagName = (name: string) => name.trim().replace(/\s+/g, " ").toLowerCase();
 
@@ -101,7 +102,7 @@ export async function GET(req: Request) {
         ];
 
         if (query) {
-            conditions.push(ilike(tagsTable.name, `%${query}%`));
+            conditions.push(ilike(tagsTable.name, `%${escapeLike(query)}%`));
         }
 
         const tags = await db.select().from(tagsTable)
