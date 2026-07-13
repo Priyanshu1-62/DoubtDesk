@@ -115,7 +115,7 @@ export async function POST(req: NextRequest) {
         const ip = getClientIp(req);
 
         const { email, expires, token } = getParams(req);
-        if (!email || !isValidRequest(email, expires, token)) {
+        if (!email) {
             return redirectWithError(req, "Invalid or expired unsubscribe link");
         }
 
@@ -123,6 +123,10 @@ export async function POST(req: NextRequest) {
         const rateLimitResult = await generalLimiter.limit(`unsubscribe:${normalizedEmail}`);
         if (!rateLimitResult.success) {
             return redirectWithError(req, "Too many unsubscribe attempts. Please try again later.");
+        }
+
+        if (!isValidRequest(email, expires, token)) {
+            return redirectWithError(req, "Invalid or expired unsubscribe link");
         }
 
         // ── CSRF nonce verification ───────────────────────────────────────────
@@ -152,8 +156,6 @@ export async function POST(req: NextRequest) {
             return redirectWithError(req, "Invalid form submission. Please try the unsubscribe link again.");
         }
         // ─────────────────────────────────────────────────────────────────────
-
-        const normalizedEmail = email.trim().toLowerCase();
 
         // If a Clerk session is attached, require it to match the email in the
         // unsubscribe token. The signed token alone is enough to authenticate
