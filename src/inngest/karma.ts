@@ -215,6 +215,11 @@ export const dailyStreakProcessor = inngest.createFunction(
         const now = new Date();
         const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
         const oneDayMs = 24 * 60 * 60 * 1000;
+        // Calendar-day boundary for "yesterday". Used to guard the exact-24h
+        // edge case where a user contributed at yesterday's midnight — that
+        // legitimately counts as a contribution on the previous calendar day
+        // and must not reset the streak. See codeant review on #886.
+        const yesterdayMidnight = todayMidnight - oneDayMs;
 
         for (const user of users) {
             try {
@@ -285,15 +290,30 @@ export const dailyStreakProcessor = inngest.createFunction(
                     await checkAndAwardBadges(user.email);
                     processed++;
 
-                } else if (daysDiff >= 2) {
+                } else if (activeTimestamp >= yesterdayMidnight) {
+                    // Exact-24h boundary case: contribution was at (or after)
+                    // yesterday's midnight — that's still a valid contribution
+                    // for the previous calendar day. daysDiff would be 1 here
+                    // but the user did contribute yesterday. Do nothing;
+                    // today's contribution (if any) will award the bonus
+                    // through the daysDiff === 0 branch above. See codeant
+                    // review on #886.
+                    skippedNoOp++;
+                } else {
+                    // activeTimestamp < yesterdayMidnight → the user did NOT
+                    // contribute on the previous calendar day and missed at
+                    // least one full day. Trace: cron runs at Wed 00:00, user
+                    // last contributed Mon at 12:00 (before Tue 00:00 =
+                    // yesterdayMidnight), so Tuesday was entirely skipped and
+                    // the streak must reset. The old `daysDiff === 1` no-op
+                    // branch let anyone maintain a streak while contributing
+                    // only every other day, corrupting the currentStreak
+                    // field that gates streak_days badges. See issue #886.
                     await db
                         .update(usersTable)
                         .set({ currentStreak: 0 })
                         .where(eq(usersTable.email, user.email));
                     processed++;
-                } else if (daysDiff === 1) {
-                    // Valid trailing active window path (Contributed yesterday, hasn't contributed today yet)
-                    skippedNoOp++;
                 }
                 
             } catch (err) {
