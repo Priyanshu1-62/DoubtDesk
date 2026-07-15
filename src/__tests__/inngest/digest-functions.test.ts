@@ -165,6 +165,11 @@ describe("sendDailyDigest — per-user step isolation", () => {
 
     // Simulate Inngest retry: same step shim (memoised results) → per-user step is a no-op.
     await handler({ step });
+    await (sendDailyDigest as any).fn({ step });
+    expect(mockSendDigestEmail).toHaveBeenCalledTimes(1);
+
+    // Simulate Inngest retry: same step shim (memoised results) → per-user step is a no-op.
+    await (sendDailyDigest as any).fn({ step });
     // sendDigestEmail must NOT be called again.
     expect(mockSendDigestEmail).toHaveBeenCalledTimes(1);
   });
