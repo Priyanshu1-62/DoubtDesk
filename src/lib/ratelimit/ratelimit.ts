@@ -100,8 +100,6 @@ if (isRedisConfigured) {
 
   redisClient = redis;
 } else {
-  const DEFAULT_TTL_MS = 5 * 60 * 1000;
-
   // Simple in-memory fallback for local development
   // Note: This won't be perfectly accurate in distributed environments but works for local testing
   const memoryMap = new Map<string, { count: number; reset: number }>();
