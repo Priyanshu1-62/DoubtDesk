@@ -22,7 +22,13 @@ interface MockLimiter {
   }>;
 }
 
+interface MockRedisValue {
+  value: unknown;
+  expiresAt: number;
+}
+
 interface MockRedis {
+    get<T = unknown>(key: string): Promise<T | null>;
     setnx(key: string, value: unknown): Promise<number>;
     set(
       key: string,
@@ -94,9 +100,30 @@ if (isRedisConfigured) {
 
   redisClient = redis;
 } else {
+  const DEFAULT_TTL_MS = 5 * 60 * 1000;
+
   // Simple in-memory fallback for local development
   // Note: This won't be perfectly accurate in distributed environments but works for local testing
   const memoryMap = new Map<string, { count: number; reset: number }>();
+
+  // // Dedicated in-memory store used to emulate generic Redis key-value operations.
+  const redisStore = new Map<string, MockRedisValue>();
+
+  // Retrieves a value from the mock Redis store and performs lazy expiration.
+  const getRedisValue = <T>(key: string): T | null => {
+    const entry = redisStore.get(key);
+
+    if (!entry) {
+      return null;
+    }
+
+    if (entry.expiresAt <= Date.now()) {
+      redisStore.delete(key);
+      return null;
+    }
+
+    return entry.value as T;
+  }
 
   const createMockLimiter = (limit: number, windowMs: number) => ({
     limit: async (identifier: string) => {
@@ -129,9 +156,14 @@ if (isRedisConfigured) {
 
   // Provide a mock redis client for locks
   redisClient = {
+    get: async <T = unknown>(key: string): Promise<T | null> => {
+      return getRedisValue<T>(key);
+    },
     setnx: async (key: string, value: unknown) => {
-      if (memoryMap.has(key)) return 0;
-      memoryMap.set(key, { count: 1, reset: Date.now() + 5 * 60 * 1000 });
+      const cachedValue = getRedisValue(key);
+      if (cachedValue !== null) return 0;
+
+      redisStore.set(key, { value, expiresAt: Date.now() + DEFAULT_TTL_MS });
       return 1;
     },
     set: async (
@@ -139,20 +171,28 @@ if (isRedisConfigured) {
       value: unknown,
       opts?: { nx?: boolean; ex?: number },
     ): Promise<"OK" | null> => {
-      if (opts?.nx && memoryMap.has(key)) return null;
-      const ttlMs = opts?.ex ? opts.ex * 1000 : 5 * 60 * 1000;
-      memoryMap.set(key, { count: 1, reset: Date.now() + ttlMs });
+      const cachedValue = getRedisValue(key);
+      
+      if (opts?.nx && cachedValue !== null) return null;
+
+      const ttlMs = opts?.ex ? opts.ex * 1000 : DEFAULT_TTL_MS;
+      redisStore.set(key, {value, expiresAt: Date.now() + ttlMs});
+
       return "OK";
     },
     del: async (key: string) => {
-      memoryMap.delete(key);
+      redisStore.delete(key);
       return 1;
     },
     expire: async (key: string, seconds: number) => {
-      const rec = memoryMap.get(key);
-      if (!rec) return 0;
-      rec.reset = Date.now() + seconds * 1000;
-      memoryMap.set(key, rec);
+      const cachedValue = getRedisValue(key);
+      if (cachedValue === null) return 0;
+
+      const entry = redisStore.get(key);
+      if (!entry) return 0;
+
+      entry.expiresAt = Date.now() + seconds * 1000;
+
       return 1;
     }
   };
