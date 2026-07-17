@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { db } from '@/configs/db';
 import { doubtsTable } from '@/configs/schema';
 import { and, eq, desc, isNull } from 'drizzle-orm';
+import { redisClient } from '@/lib/ratelimit/ratelimit';
+import crypto from "node:crypto";
 import { groq } from '@/lib/ai/groq-client';
 import { buildErrorResponse } from '@/lib/errors/error-handler';
 import {
@@ -9,6 +11,26 @@ import {
     requireAuth,
     requireMembership,
 } from '@/lib/auth/membership-guard';
+
+const CACHE_PREFIX = "personal-analytics";
+const CACHE_TTL_SECONDS = 60 * 60;
+
+interface PersonalAnalyticsResult {
+    "weakTopics": {
+        "topic": string;
+        "reason": string;
+        "confidence": "High" | "Medium" | "Low";
+    }[];
+    "insight": string;
+    "recommendations": {
+        "practiceQuestions": string[];
+        "conceptExplainer": string;
+    }
+}
+
+interface AnalyticsResponse extends PersonalAnalyticsResult {
+    "isEngaged": boolean;
+}
 
 export async function GET(req: Request) {
     try {
@@ -49,6 +71,26 @@ export async function GET(req: Request) {
         // Prepare doubt summaries for AI analysis
         const doubtContext = userDoubts.map((d: any) => `- [${d.subject}]: ${d.content}`).join('\n');
 
+        const stateHash = crypto
+            .createHash("sha256")
+            .update(doubtContext)
+            .digest("hex");
+
+        // Generate a cache key based on the current state of the user's doubts.
+        const cacheKey = `${CACHE_PREFIX}:${email}:${classroomIdStr}:${stateHash}`;
+
+        try {
+            // Cache-aside lookup: reuse previously generated analytics if user's doubts have not changed.
+            const cachedResponse = await redisClient.get<AnalyticsResponse>(cacheKey);
+
+            if (cachedResponse) {
+                return NextResponse.json(cachedResponse);
+            }
+
+        } catch (error) {
+            console.error("Personal Analytics Redis Cache GET Error:", error);
+        }
+
         const systemPrompt = `You are an AI Learning Mentor. Analyze the student's academic doubts across their classroom activities.
         Your goal is to identify patterns, recurring sub-topics they struggle with, and provide actionable recommendations.
         
@@ -73,12 +115,21 @@ export async function GET(req: Request) {
             response_format: { type: "json_object" }
         });
 
-        const result = JSON.parse(response.choices[0].message.content || "{}");
+        const result: PersonalAnalyticsResult = JSON.parse(response.choices[0].message.content || "{}");
 
-        return NextResponse.json({
+        const analyticsResponse: AnalyticsResponse = {
             isEngaged: true,
             ...result
-        });
+        };
+
+        try {
+            await redisClient.set(cacheKey, analyticsResponse, {ex: CACHE_TTL_SECONDS});
+
+        } catch (error) {
+            console.error("Personal Analytics Redis Cache SET Error:", error);
+        }
+
+        return NextResponse.json(analyticsResponse);
 
     } catch (error: unknown) {
         const { status, body } = buildErrorResponse(error);
